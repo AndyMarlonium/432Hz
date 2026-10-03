@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html{color-scheme:light}body{margin:0;font-size:14px}</style>
+<title>Diapason Solfeggio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: a tuning desk. Transport on top, then the playlist, then a ladder of ten reference pitches to switch between. */
+:root {
+  --bg: #e8edf0;
+  --surface: #f7f9fa;
+  --surface-2: #dde4e9;
+  --ink: #0f1c25;
+  --ink-soft: #4a5b68;
+  --line: #c3cdd5;
+  --accent: #2a3de0;
+  --accent-ink: #ffffff;
+  --warm: #b4541a;
+  --font-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d141a; --surface: #151e26; --surface-2: #1d2832; --ink: #e6edf2; --ink-soft: #93a4b1;
+    --line: #2b3844; --accent: #8e9bff; --accent-ink: #0d141a; --warm: #e0894f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d141a; --surface: #151e26; --surface-2: #1d2832; --ink: #e6edf2; --ink-soft: #93a4b1;
+  --line: #2b3844; --accent: #8e9bff; --accent-ink: #0d141a; --warm: #e0894f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; padding-inline: 16px; padding-block: 28px 48px; }
+.wrap { max-width: 980px; margin-inline: auto; display: flex; flex-direction: column; gap: 22px; }
+header { display: flex; flex-direction: column; gap: 6px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2rem, 6vw, 3.1rem); letter-spacing: -0.02em; line-height: 1; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+.label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
+
+.deck { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0; overflow: hidden; }
+@media (max-width: 720px) { .deck { grid-template-columns: minmax(0, 1fr); } }
+.deck-left { padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.deck-right { padding: 20px; background: var(--surface-2); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.drop { border: 1.5px dashed var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: border-color .15s, background .15s; min-width: 0; }
+.drop:hover, .drop.over, .drop:focus-visible { border-color: var(--accent); background: var(--surface-2); outline: none; }
+.drop strong { font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; overflow-wrap: anywhere; }
+.drop span { color: var(--ink-soft); font-size: 13px; }
+#file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+.seekrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, .tile:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 9px 14px; font-weight: 500; display: inline-block; line-height: 1.3; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 110px; }
+.btn.on { border-color: var(--warm); color: var(--warm); }
+.btn.small { padding: 6px 11px; font-size: 13px; }
+
+.readout { display: flex; flex-direction: column; gap: 2px; }
+.readout .big { font-family: var(--font-mono); font-size: clamp(2.4rem, 8vw, 3.6rem); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+.readout .big small { font-size: .4em; color: var(--ink-soft); letter-spacing: 0; margin-left: 4px; }
+.readout .meta { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-soft); }
+canvas { width: 100%; height: 84px; display: block; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); }
+.mix { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; }
+
+.plsec { display: flex; flex-direction: column; gap: 12px; }
+.plhead { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.plhead .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.plist { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; max-height: 300px; overflow-y: auto; }
+.pl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-bottom: 1px solid var(--line); }
+.pl-row:last-child { border-bottom: 0; }
+.pl-main { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 14px; min-width: 0; }
+.pl-main:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pl-row:hover { background: var(--surface-2); }
+.pl-row .n, .pl-row .ic { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.pl-row .ic { display: none; color: var(--accent); }
+.pl-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-row .du { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.pl-row.cur { background: var(--surface-2); }
+.pl-row.cur .nm { font-weight: 600; }
+.pl-row.cur .n { color: var(--accent); }
+.plist.is-playing .pl-row.cur .n { display: none; }
+.plist.is-playing .pl-row.cur .ic { display: inline; }
+.pl-row.bad .nm { text-decoration: line-through; color: var(--ink-soft); }
+.pl-x { all: unset; box-sizing: border-box; cursor: pointer; padding: 10px 14px; color: var(--ink-soft); font-size: 16px; line-height: 1; }
+.pl-x:hover { color: var(--warm); }
+.pl-x:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.empty { padding: 22px 16px; color: var(--ink-soft); font-size: 14px; }
+
+.ladder { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 10px; }
+.tile { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; color: var(--ink); min-width: 0; }
+.tile:hover { border-color: var(--accent); }
+.tile[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tile .hz { font-family: var(--font-mono); font-size: 1.55rem; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.tile .hz small { font-size: .55em; opacity: .7; margin-left: 3px; }
+.tile .nm { font-family: var(--font-display); font-weight: 500; font-size: 1rem; }
+.tile .nt { font-family: var(--font-mono); font-size: 11.5px; opacity: .75; }
+.tile.ref { border-style: dashed; }
+.tile.verdi .hz { color: var(--warm); }
+.tile.verdi[aria-pressed="true"] .hz { color: inherit; }
+.note { color: var(--ink-soft); font-size: 13px; max-width: 75ch; margin: 0; }
+.status { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); min-height: 1.4em; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="label">Lecteur d'accordage</span>
+    <h1>Diapason Solfeggio</h1>
+    <p>Importe des MP3, puis bascule entre l'original en 440&nbsp;Hz, le 432&nbsp;Hz et les neuf fréquences Solfeggio, sans interrompre la lecture.</p>
+  </header>
+
+  <section class="deck" aria-label="Lecteur">
+    <div class="deck-left">
+      <label class="drop" id="drop" tabindex="0" for="file">
+        <span class="label">En lecture</span>
+        <strong id="trackName">Choisir ou déposer des fichiers MP3</strong>
+        <span id="trackInfo">Les fichiers restent dans ton navigateur, rien n'est envoyé.</span>
+      </label>
+      <input type="file" id="file" accept="audio/mpeg,audio/mp3,audio/*,.mp3" multiple>
+
+      <div class="seekrow">
+        <span id="tCur">0:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" disabled aria-label="Position dans le morceau">
+        <span id="tDur">0:00</span>
+      </div>
+
+      <div class="controls">
+        <button class="btn" id="prev" disabled>Précédent</button>
+        <button class="btn primary" id="play" disabled>Lecture</button>
+        <button class="btn" id="next" disabled>Suivant</button>
+        <button class="btn" id="loop" aria-pressed="false" title="Alterner : aucune boucle, boucle du morceau, boucle de l'album">Boucle : aucune</button>
+      </div>
+      <div class="controls">
+        <button class="btn" id="ab" disabled title="Alterner entre l'original et la fréquence choisie">Original ⇄ choix</button>
+        <button class="btn" id="toneBtn" aria-pressed="false">Ton pur</button>
+      </div>
+
+      <div class="mix">
+        <label class="label" for="vol">Volume</label>
+        <input type="range" id="vol" min="0" max="100" value="80">
+        <label class="label" for="toneVol">Ton pur</label>
+        <input type="range" id="toneVol" min="0" max="100" value="25">
+      </div>
+      <div class="status" id="status" role="status"></div>
+    </div>
+
+    <div class="deck-right">
+      <span class="label">Accordage actif</span>
+      <div class="readout">
+        <div class="big"><span id="rHz">440</span><small>Hz</small></div>
+        <div class="meta" id="rMeta">Original · décalage 0 cent · vitesse ×1,0000</div>
+      </div>
+      <canvas id="viz" width="600" height="168" aria-label="Spectre du son"></canvas>
+    </div>
+  </section>
+
+  <section class="plsec" aria-label="Playlist">
+    <div class="plhead">
+      <span class="label" id="plLabel">Playlist · 0 morceau</span>
+      <div class="acts">
+        <label class="btn small" for="file">Ajouter des MP3</label>
+        <button class="btn small" id="clear" disabled>Vider</button>
+      </div>
+    </div>
+    <ul class="plist" id="plist"></ul>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <span class="label">Fréquences de référence</span>
+    <div class="ladder" id="ladder"></div>
+    <p class="note">Chaque fréquence est appliquée à la note la plus proche de la gamme à 440&nbsp;Hz : le morceau est transposé d'une fraction de demi-ton (jamais plus de 50 cents), et le tempo varie d'autant, comme sur un disque. Les vertus associées à chaque fréquence sont des attributions traditionnelles, sans preuve scientifique.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var NOTES = ["Do","Do♯","Ré","Ré♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Si"];
+  var FREQS = [
+    { id: "orig", hz: 440, name: "Original", tag: "La 440 Hz, norme actuelle", ref: true },
+    { id: "f432", hz: 432, name: "Accordage de Verdi", tag: "", verdi: true },
+    { id: "f174", hz: 174, name: "Apaisement" },
+    { id: "f285", hz: 285, name: "Régénération" },
+    { id: "f396", hz: 396, name: "Libération" },
+    { id: "f417", hz: 417, name: "Changement" },
+    { id: "f528", hz: 528, name: "Transformation" },
+    { id: "f639", hz: 639, name: "Relations" },
+    { id: "f741", hz: 741, name: "Expression" },
+    { id: "f852", hz: 852, name: "Intuition" },
+    { id: "f963", hz: 963, name: "Éveil" }
+  ];
+  FREQS.forEach(function (f) {
+    var midi = 69 + 12 * Math.log2(f.hz / 440);
+    var r = Math.round(midi);
+    f.cents = (midi - r) * 100;
+    f.note = NOTES[((r % 12) + 12) % 12] + (Math.floor(r / 12) - 1);
+    if (f.id === "orig") f.cents = 0;
+  });
+
+  var LOOPS = ["Boucle : aucune", "Boucle : morceau", "Boucle : album"];
+  var $ = function (id) { return document.getElementById(id); };
+  var ctx = null, buffer = null, src = null, songGain, toneGain, osc = null, analyser, master;
+  var playing = false, offset = 0, t0 = 0, rate = 1, toneOn = false;
+  var sel = FREQS[1], prev = FREQS[0];
+  var list = [], cur = -1, loopMode = 0, loadTok = 0;
+
+  function fmtRate(c) { return Math.pow(2, c / 1200); }
+  function fmtT(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+  function say(t) { $("status").textContent = t; }
+
+  function ensureCtx() {
+    if (ctx) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = 1;
+    analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
+    songGain = ctx.createGain(); songGain.gain.value = $("vol").value / 100;
+    toneGain = ctx.createGain(); toneGain.gain.value = 0;
+    songGain.connect(master); toneGain.connect(master);
+    master.connect(analyser); analyser.connect(ctx.destination);
+  }
+
+  function getPos() {
+    if (!playing || !buffer) return offset;
+    var p = offset + (ctx.currentTime - t0) * rate;
+    if (loopMode === 1) return p % buffer.duration;
+    return Math.min(buffer.duration, p);
+  }
+
+  function startSrc(from) {
+    var s = ctx.createBufferSource();
+    s.buffer = buffer; s.playbackRate.value = rate;
+    s.loop = loopMode === 1;
+    s.connect(songGain);
+    s.onended = function () {
+      if (s !== src) return;
+      src = null; playing = false; offset = 0;
+      refreshTransport(); drawSeek();
+      advance();
+    };
+    src = s; offset = from; t0 = ctx.currentTime;
+    s.start(0, from);
+  }
+  function stopSrc() {
+    if (!src) return;
+    var s = src; src = null;
+    s.onended = null;
+    try { s.stop(); } catch (e) {}
+  }
+
+  function play() {
+    if (!buffer) return;
+    ensureCtx();
+    ctx.resume();
+    if (offset >= buffer.duration - 0.05) offset = 0;
+    startSrc(offset);
+    playing = true;
+    refreshTransport();
+  }
+  function pause() {
+    if (!playing) return;
+    offset = getPos();
+    stopSrc();
+    playing = false;
+    refreshTransport();
+  }
+  function seekTo(frac) {
+    if (!buffer) return;
+    var p = frac * buffer.duration;
+    if (playing) { stopSrc(); startSrc(p); } else { offset = p; }
+    drawSeek();
+  }
+
+  function refreshTransport() {
+    $("play").textContent = playing ? "Pause" : "Lecture";
+    $("play").disabled = !buffer;
+    $("ab").disabled = !buffer;
+    $("seek").disabled = !buffer;
+    $("prev").disabled = cur < 0;
+    $("next").disabled = cur < 0 || (cur >= list.length - 1 && loopMode !== 2);
+    $("clear").disabled = list.length === 0;
+    $("plist").classList.toggle("is-playing", playing);
+  }
+
+  // ---- Playlist ----
+  function decodeItem(i) {
+    var it = list[i];
+    if (it.buf) return Promise.resolve(it.buf);
+    if (it.pending) return it.pending;
+    ensureCtx();
+    it.pending = it.file.arrayBuffer().then(function (ab) {
+      return new Promise(function (res, rej) { ctx.decodeAudioData(ab, res, rej); });
+    }).then(function (b) {
+      it.buf = b; it.dur = b.duration; it.pending = null; renderList();
+      return b;
+    }, function (e) { it.pending = null; throw e; });
+    return it.pending;
+  }
+
+  function trim() {
+    var keep = {};
+    keep[cur] = true;
+    if (cur + 1 < list.length) keep[cur + 1] = true;
+    else if (loopMode === 2 && list.length) keep[0] = true;
+    list.forEach(function (it, k) { if (!keep[k]) it.buf = null; });
+  }
+
+  function preloadNext() {
+    var n = cur + 1 < list.length ? cur + 1 : (loopMode === 2 && list.length > 1 ? 0 : -1);
+    if (n >= 0) decodeItem(n).catch(function () {});
+  }
+
+  function selectTrack(i, autoplay) {
+    if (i < 0 || i >= list.length) return;
+    var tok = ++loadTok;
+    stopSrc(); playing = false; offset = 0;
+    cur = i;
+    renderList(); refreshTransport();
+    say("Décodage de « " + list[i].name + " »…");
+    decodeItem(i).then(function (b) {
+      if (tok !== loadTok) return;
+      buffer = b;
+      $("tDur").textContent = fmtT(b.duration);
+      showTrack();
+      refreshTransport(); drawSeek();
+      say(autoplay ? "" : "Prêt. Lance la lecture, puis choisis une fréquence.");
+      if (autoplay) play();
+      trim(); preloadNext();
+    }, function () {
+      if (tok !== loadTok) return;
+      list[i].bad = true; buffer = null;
+      renderList();
+      say("« " + list[i].name + " » n'a pas pu être décodé.");
+      if (autoplay && i + 1 < list.length) selectTrack(i + 1, true);
+      else refreshTransport();
+    });
+  }
+
+  function showTrack() {
+    var it = list[cur];
+    if (!it) {
+      $("trackName").textContent = "Choisir ou déposer des fichiers MP3";
+      $("trackInfo").textContent = "Les fichiers restent dans ton navigateur, rien n'est envoyé.";
+      $("tDur").textContent = "0:00";
+      return;
+    }
+    $("trackName").textContent = it.name;
+    var b = it.buf || buffer;
+    $("trackInfo").textContent = (cur + 1) + " sur " + list.length +
+      (b ? " · " + fmtT(b.duration) + " · " + b.numberOfChannels + " canal" + (b.numberOfChannels > 1 ? "ux" : "") + " · " + Math.round(b.sampleRate / 100) / 10 + " kHz" : "") +
+      " · clique pour ajouter des fichiers";
+  }
+
+  function advance() {
+    var n = cur + 1;
+    if (n < list.length) selectTrack(n, true);
+    else if (loopMode === 2 && list.length) selectTrack(0, true);
+  }
+
+  function addFiles(files) {
+    var added = 0;
+    Array.prototype.forEach.call(files, function (f) {
+      if (/\.(mp3|m4a|aac|wav|ogg|oga|flac)$/i.test(f.name) || /^audio\//.test(f.type)) {
+        list.push({ file: f, name: f.name.replace(/\.[^.]+$/, ""), dur: null, buf: null, pending: null, bad: false });
+        added++;
+      }
+    });
+    if (!added) { say("Aucun fichier audio reconnu."); return; }
+    ensureCtx();
+    renderList();
+    if (cur === -1) selectTrack(0, false);
+    else { showTrack(); refreshTransport(); say(added + (added > 1 ? " morceaux ajoutés." : " morceau ajouté.")); preloadNext(); }
+  }
+
+  function removeAt(i) {
+    var wasCur = i === cur, wasPlaying = playing;
+    if (wasCur) { ++loadTok; stopSrc(); playing = false; buffer = null; offset = 0; }
+    list.splice(i, 1);
+    if (!list.length) {
+      cur = -1; buffer = null;
+      showTrack(); renderList(); refreshTransport(); drawSeek();
+      say("Playlist vide.");
+      return;
+    }
+    if (wasCur) { selectTrack(Math.min(i, list.length - 1), wasPlaying); }
+    else { if (i < cur) cur--; showTrack(); renderList(); refreshTransport(); }
+  }
+
+  function renderList() {
+    var ul = $("plist");
+    ul.textContent = "";
+    $("plLabel").textContent = "Playlist · " + list.length + (list.length > 1 ? " morceaux" : " morceau");
+    if (!list.length) {
+      var li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "La playlist est vide. Ajoute un ou plusieurs MP3 : ils se liront l'un après l'autre.";
+      ul.appendChild(li);
+      return;
+    }
+    list.forEach(function (it, i) {
+      var li = document.createElement("li");
+      li.className = "pl-row" + (i === cur ? " cur" : "") + (it.bad ? " bad" : "");
+      var main = document.createElement("button");
+      main.type = "button"; main.className = "pl-main";
+      if (i === cur) main.setAttribute("aria-current", "true");
+      var n = document.createElement("span"); n.className = "n"; n.textContent = String(i + 1).padStart(2, "0");
+      var ic = document.createElement("span"); ic.className = "ic"; ic.textContent = "▶";
+      var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = it.name; nm.title = it.name;
+      var du = document.createElement("span"); du.className = "du"; du.textContent = it.dur ? fmtT(it.dur) : "–:––";
+      var lead = document.createElement("span"); lead.appendChild(n); lead.appendChild(ic);
+      main.appendChild(lead); main.appendChild(nm); main.appendChild(du);
+      main.addEventListener("click", function () {
+        if (i === cur && buffer) { playing ? pause() : play(); } else { selectTrack(i, true); }
+      });
+      var x = document.createElement("button");
+      x.type = "button"; x.className = "pl-x"; x.textContent = "✕";
+      x.setAttribute("aria-label", "Retirer " + it.name);
+      x.addEventListener("click", function () { removeAt(i); });
+      li.appendChild(main); li.appendChild(x);
+      ul.appendChild(li);
+    });
+    ul.classList.toggle("is-playing", playing);
+  }
+
+  function setLoop(m) {
+    // Keep the playhead continuous while the source changes between looping and one-shot.
+    if (playing && src && buffer) {
+      var p = getPos();
+      loopMode = m;
+      offset = p; t0 = ctx.currentTime;
+      src.loop = m === 1;
+    } else {
+      loopMode = m;
+    }
+    $("loop").textContent = LOOPS[m];
+    $("loop").setAttribute("aria-pressed", String(m !== 0));
+    $("loop").classList.toggle("on", m !== 0);
+    refreshTransport();
+    if (m === 2) preloadNext();
+  }
+
+  // ---- Tuning ----
+  function applySelection(f) {
+    if (f !== sel) prev = sel;
+    sel = f;
+    var newRate = fmtRate(f.cents);
+    if (ctx && playing && src) {
+      offset = getPos(); t0 = ctx.currentTime;
+      rate = newRate;
+      src.playbackRate.setTargetAtTime(rate, ctx.currentTime, 0.02);
+    } else {
+      rate = newRate;
+    }
+    if (osc) osc.frequency.setTargetAtTime(f.hz, ctx.currentTime, 0.03);
+    $("rHz").textContent = f.hz;
+    var c = f.cents;
+    var cs = (c >= 0 ? "+" : "−") + Math.abs(c).toFixed(1).replace(".", ",");
+    $("rMeta").textContent = (f.id === "orig" ? "Original" : f.note + " ramenée à " + f.hz + " Hz") +
+      " · décalage " + cs + " cents · vitesse ×" + rate.toFixed(4).replace(".", ",");
+    document.querySelectorAll(".tile").forEach(function (t) {
+      t.setAttribute("aria-pressed", String(t.dataset.id === f.id));
+    });
+  }
+
+  function setTone(on) {
+    toneOn = on;
+    $("toneBtn").setAttribute("aria-pressed", String(on));
+    $("toneBtn").classList.toggle("on", on);
+    ensureCtx(); ctx.resume();
+    if (on) {
+      osc = ctx.createOscillator(); osc.type = "sine"; osc.frequency.value = sel.hz;
+      osc.connect(toneGain); osc.start();
+      toneGain.gain.setTargetAtTime($("toneVol").value / 100 * 0.5, ctx.currentTime, 0.05);
+    } else if (osc) {
+      var o = osc; osc = null;
+      toneGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      setTimeout(function () { try { o.stop(); o.disconnect(); } catch (e) {} }, 300);
+    }
+  }
+
+  function drawSeek() {
+    var pos = buffer ? getPos() : 0;
+    $("tCur").textContent = fmtT(pos);
+    if (buffer && document.activeElement !== $("seek")) $("seek").value = Math.round(pos / buffer.duration * 1000);
+    if (!buffer) $("seek").value = 0;
+  }
+
+  // ---- Spectrum ----
+  var cv = $("viz"), g = cv.getContext("2d"), bins;
+  function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function draw() {
+    requestAnimationFrame(draw);
+    if (playing) drawSeek();
+    var w = cv.width, h = cv.height;
+    g.clearRect(0, 0, w, h);
+    var N = 56, bw = w / N;
+    if (analyser) {
+      if (!bins) bins = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(bins);
+    }
+    var lo = 40, hi = 5000, nyq = ctx ? ctx.sampleRate / 2 : 22050;
+    g.fillStyle = css("--accent");
+    for (var i = 0; i < N; i++) {
+      var f1 = lo * Math.pow(hi / lo, i / N), f2 = lo * Math.pow(hi / lo, (i + 1) / N);
+      var b1 = Math.floor(f1 / nyq * (bins ? bins.length : 1024)), b2 = Math.max(b1 + 1, Math.floor(f2 / nyq * (bins ? bins.length : 1024)));
+      var m = 0;
+      if (bins) for (var b = b1; b < b2 && b < bins.length; b++) m = Math.max(m, bins[b]);
+      var bh = Math.max(3, m / 255 * (h - 14));
+      g.globalAlpha = 0.9;
+      g.fillRect(i * bw + 2, h - bh - 4, bw - 4, bh);
+    }
+    var x = Math.log(sel.hz / lo) / Math.log(hi / lo) * w;
+    if (x > 0 && x < w) {
+      g.globalAlpha = 1; g.strokeStyle = css("--warm"); g.lineWidth = 2;
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke();
+    }
+    g.globalAlpha = 1;
+  }
+
+  // ---- Ladder ----
+  var ladder = $("ladder");
+  FREQS.forEach(function (f) {
+    var b = document.createElement("button");
+    b.className = "tile" + (f.ref ? " ref" : "") + (f.verdi ? " verdi" : "");
+    b.dataset.id = f.id; b.type = "button";
+    var cs = f.id === "orig" ? "référence" : (f.cents >= 0 ? "+" : "−") + Math.abs(f.cents).toFixed(1).replace(".", ",") + " ct";
+    b.innerHTML = '<span class="hz">' + f.hz + '<small>Hz</small></span><span class="nm">' + f.name + '</span><span class="nt">' + (f.id === "orig" ? f.tag : f.note + " · " + cs) + '</span>';
+    b.addEventListener("click", function () { applySelection(f); });
+    ladder.appendChild(b);
+  });
+
+  // ---- Events ----
+  $("file").addEventListener("change", function (e) { addFiles(e.target.files); e.target.value = ""; });
+  var drop = $("drop");
+  drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+  ["dragenter", "dragover"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("over"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("over"); }); });
+  drop.addEventListener("drop", function (e) { addFiles(e.dataTransfer.files); });
+  $("play").addEventListener("click", function () { playing ? pause() : play(); });
+  $("seek").addEventListener("input", function (e) { seekTo(e.target.value / 1000); });
+  $("prev").addEventListener("click", function () {
+    if (cur < 0) return;
+    if (cur === 0 || getPos() > 3) seekTo(0);
+    else selectTrack(cur - 1, playing);
+  });
+  $("next").addEventListener("click", function () {
+    if (cur < 0) return;
+    var n = cur + 1;
+    if (n >= list.length) { if (loopMode === 2) n = 0; else return; }
+    selectTrack(n, playing);
+  });
+  $("loop").addEventListener("click", function () { setLoop((loopMode + 1) % 3); });
+  $("clear").addEventListener("click", function () {
+    ++loadTok; stopSrc(); playing = false; buffer = null; offset = 0; cur = -1; list = [];
+    showTrack(); renderList(); refreshTransport(); drawSeek();
+    say("Playlist vidée.");
+  });
+  $("ab").addEventListener("click", function () {
+    var target = sel.id === "orig" ? (prev.id === "orig" ? FREQS[1] : prev) : FREQS[0];
+    applySelection(target);
+  });
+  $("toneBtn").addEventListener("click", function () { setTone(!toneOn); });
+  $("vol").addEventListener("input", function (e) { if (songGain) songGain.gain.setTargetAtTime(e.target.value / 100, ctx.currentTime, 0.02); });
+  $("toneVol").addEventListener("input", function (e) { if (toneOn && toneGain) toneGain.gain.setTargetAtTime(e.target.value / 100 * 0.5, ctx.currentTime, 0.02); });
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" && buffer && !/INPUT|BUTTON|LABEL/.test(document.activeElement.tagName)) { e.preventDefault(); playing ? pause() : play(); }
+  });
+
+  applySelection(FREQS[1]);
+  renderList();
+  refreshTransport();
+  say("Importe un ou plusieurs MP3, ou active « Ton pur » pour entendre une fréquence seule.");
+  draw();
+})();
+</script>
+
+</body>
+</html>
